@@ -63,12 +63,14 @@
     </div>
   </section>
 
+  <!-- Modal (Auto-injected from JS) -->
+  <div id="modal-container"></div>
+
   <!-- Footer -->
   <footer class="footer">
     © 2025 KomoTV. Powered by TMDB.
   </footer>
 
-  <!-- JS Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script src="main.js"></script>
 </body>
