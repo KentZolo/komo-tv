@@ -10,7 +10,6 @@ function getImageUrl(path, isBackdrop = false) {
     : 'https://via.placeholder.com/500x750?text=No+Poster';
 }
 
-// Banner Logic
 let bannerIndex = 0;
 let bannerItems = [];
 
@@ -41,9 +40,9 @@ function showBannerSlide(index) {
     `⭐ ${item.vote_average?.toFixed(1) || 'N/A'} · 🎬 Movie · ${item.release_date?.slice(0, 4) || ''}`;
   document.getElementById('poster-summary').textContent = item.title;
 
-  img.onclick = () => {
-    window.location.href = `poster.html?id=${item.id}&type=movie`;
-  };
+  img.addEventListener('click', () => {
+    openModal(item.id, 'movie');
+  });
 }
 
 function prevSlide() {
@@ -56,7 +55,7 @@ function nextSlide() {
   showBannerSlide(bannerIndex);
 }
 
-// Swiper Loader
+// Load swipers
 async function fetchAndDisplay(endpoint, containerSelector, type) {
   try {
     const res = await fetch(`${BASE_URL}${endpoint}?api_key=${API_KEY}`);
@@ -91,7 +90,7 @@ function displayMedia(items, containerSelector, defaultType) {
       const img = poster.querySelector('img');
       const id = img.dataset.id;
       const type = img.dataset.type;
-      window.location.href = `poster.html?id=${id}&type=${type}`;
+      openModal(id, type);
     });
   });
 }
@@ -111,7 +110,6 @@ function initSwipers() {
   new Swiper('.tv-swiper', options);
 }
 
-// Search + Genre + Hamburger
 function setupSearchRedirect() {
   const searchBtn = document.getElementById('search-button');
   const searchInput = document.getElementById('search-input');
@@ -166,6 +164,88 @@ async function loadGenres() {
   }
 }
 
+// ✅ NEW: openModal logic
+const SERVERS = [
+  { id: 'apimocine', name: 'Apimocine', url: (t, id) => `https://apimocine.vercel.app/${t}/${id}?autoplay=true` },
+  { id: 'vidsrc', name: 'Vidsrc.to', url: (t, id) => `https://vidsrc.to/embed/${t}/${id}` },
+  { id: 'vidsrccc', name: 'Vidsrc.cc', url: (t, id) => `https://vidsrc.cc/v2/embed/${t}/${id}` }
+];
+
+async function openModal(id, type) {
+  const res = await fetch(`${BASE_URL}/${type}/${id}?api_key=${API_KEY}`);
+  const data = await res.json();
+  const title = data.title || data.name;
+  const year = (data.release_date || data.first_air_date || '').slice(0, 4);
+  const rating = data.vote_average?.toFixed(1) || 'N/A';
+  const overview = data.overview || 'No description available.';
+  const genres = data.genres?.map(g => `<span>${g.name}</span>`).join('');
+  const poster = getImageUrl(data.poster_path);
+
+  const modalHtml = `
+    <div class="modal">
+      <div class="modal-content">
+        <span class="close-btn">×</span>
+        <h3>${title}</h3>
+        <p>⭐ ${rating} · ${type.toUpperCase()} · ${year}</p>
+        <div class="genres">${genres}</div>
+        <p>${overview}</p>
+        <label>Server:</label>
+        <select id="server-select">
+          ${SERVERS.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+        </select>
+        <div class="iframe-shield">Loading player...</div>
+        <iframe id="player-frame" allowfullscreen></iframe>
+      </div>
+    </div>
+  `;
+
+  const container = document.getElementById('modal-container');
+  container.innerHTML = modalHtml;
+  document.body.style.overflow = 'hidden';
+
+  const modal = document.querySelector('.modal');
+  const iframe = modal.querySelector('#player-frame');
+  const shield = modal.querySelector('.iframe-shield');
+  const select = modal.querySelector('#server-select');
+
+  function loadServer(index) {
+    const server = SERVERS[index];
+    select.value = server.id;
+    iframe.src = server.url(type, id);
+    shield.style.display = 'block';
+    setTimeout(() => (shield.style.display = 'none'), 3000);
+
+    iframe.onerror = () => {
+      if (index + 1 < SERVERS.length) {
+        loadServer(index + 1);
+      } else {
+        shield.textContent = 'No working server found.';
+      }
+    };
+  }
+
+  loadServer(0);
+
+  select.addEventListener('change', () => {
+    const selected = SERVERS.find(s => s.id === select.value);
+    if (selected) {
+      iframe.src = selected.url(type, id);
+    }
+  });
+
+  modal.querySelector('.close-btn').addEventListener('click', () => {
+    modal.remove();
+    document.body.style.overflow = '';
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+      document.body.style.overflow = '';
+    }
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   toggleMenu();
   setupSearchRedirect();
@@ -176,4 +256,3 @@ window.addEventListener('DOMContentLoaded', () => {
   fetchAndDisplay('/tv/popular', '.tv-list', 'tv');
   initSwipers();
 });
-          
